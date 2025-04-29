@@ -1,13 +1,14 @@
-#![no_std]
-
 extern crate alloc;
+use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+use alloc::string::ToString;
+use noli::net::lookup_host;
+use noli::net::TcpStream;
+use noli::print;
 use saba_core::error::Error;
 use saba_core::http::HttpResponse;
 use noli::net::SocketAddr;
-
-pub mod http;
 
 pub struct HttpClient {}
 
@@ -15,6 +16,7 @@ impl HttpClient {
     pub fn new() -> Self {
         Self {}
     }
+
     pub fn get(&self, host: String, port: u16, path: String) -> Result<HttpResponse, Error>
     {
         // 一つのドメイン名に対して複数のIPアドレスが見つかる可能性があるので、戻り値はベクタになっています。
@@ -46,15 +48,15 @@ impl HttpClient {
 
         let mut request = String::from("GET /");
         request.push_str(&path);
-        request.push_str("HTTP/1.1\n");
+        request.push_str(" HTTP/1.1\n");
 
         // ヘッダの追加
         request.push_str("Host: ");
         request.push_str(&host);
-        request.push_str("\n");
+        request.push('\n');
         request.push_str("Accept: text/html\n");
         request.push_str("Connection: close\n");
-        request.push_str("\n");
+        request.push('\n');
 
         let _bytes_written = match stream.write(request.as_bytes()) {
             Ok(bytes) => bytes,

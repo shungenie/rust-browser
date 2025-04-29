@@ -14,6 +14,7 @@ impl Header {
         Self { name, value }
     }
 }
+#[derive(Debug, Clone)]
 pub struct HttpResponse {
     version: String,
     status_code: u32,
@@ -24,7 +25,7 @@ pub struct HttpResponse {
 
 impl HttpResponse {
     pub fn new(raw_response: String) -> Result<Self, Error> {
-        let preprocessed_response = raw_response.trim_start().replace("\n\r", "\n");
+        let preprocessed_response = raw_response.trim_start().replace("\r\n", "\n");
 
         let (status_line, remaining) = match preprocessed_response.split_once("\n") {
             Some((s, r)) => (s, r),
