@@ -121,7 +121,7 @@ impl HtmlTokenizer {
                     attributes: _,
                 } => *self_closing = true,
                 _ => panic!("`latest_token` should be either StartTag"),
-            }        
+            }
         }
     }
 }
@@ -448,9 +448,54 @@ impl Iterator for HtmlTokenizer {
                     self.state = State::ScriptData;
                     return Some(HtmlToken::Char('<'));
                 }
-                // TODO: ここから先は未実装
-                // State::ScriptDataEndTagOpen 
-                _ => {}
+                State::ScriptDataEndTagOpen => {
+                    if c.is_ascii_alphabetic() {
+                        self.reconsume = true;
+                        self.state = State::ScriptDataEndTagName;
+                        self.create_tag(false);
+                        continue;
+                    }
+
+                    self.reconsume = true;
+                    self.state = State::ScriptData;
+                    // 仕様では、"<"と"/"の2つの文字トークンを返すとなっているが、
+                    // 私たちの実装ではnextメソッドからは一つのトークンしか返せない
+                    // ため、"<"のトークンのみを返す
+                    return Some(HtmlToken::Char('<'));
+                }
+                State::ScriptDataEndTagName => {
+                    if c == '>' {
+                        self.state = State::Data;
+                        return self.take_latest_token();
+                    }
+
+                    if c.is_ascii_alphabetic() {
+                        self.buf.push(c);
+                        self.append_tag_name(c.to_ascii_lowercase());
+                        continue;
+                    }
+
+                    self.state = State::TemporaryBuffer;
+                    self.buf = String::from("</") + &self.buf;
+                    self.buf.push(c);
+                    continue;
+                }
+                State::TemporaryBuffer => {
+                    self.reconsume = true;
+                    if self.buf.chars().count() == 0 {
+                        self.state = State::ScriptData;
+                        continue;
+                    }
+
+                    // 最初の１文字を削除する
+                    let c = self
+                        .buf
+                        .chars()
+                        .nth(0)
+                        .expect("self.buf shourld have at least 1 character");
+                    self.buf.remove(0);
+                    return Some(HtmlToken::Char(c));
+                }
             }
         }
     }
