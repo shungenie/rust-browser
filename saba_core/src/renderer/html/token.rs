@@ -24,6 +24,10 @@ impl HtmlTokenizer {
         }
     }
 
+    fn is_eof(&self) -> bool {
+        self.pos > self.input.len()
+    }
+
     fn consume_next_input(&mut self) -> char {
         let c = self.input[self.pos];
         self.pos += 1;
