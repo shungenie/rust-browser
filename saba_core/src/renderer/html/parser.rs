@@ -7,9 +7,9 @@ use crate::renderer::html::attribute::Attribute;
 use crate::renderer::html::token::HtmlToken;
 use crate::renderer::html::token::HtmlTokenizer;
 use alloc::rc::Rc;
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::RefCell;
-use alloc::string::String;
 
 #[derive(Debug, Clone)]
 pub struct HtmlParser {
@@ -171,14 +171,16 @@ impl HtmlParser {
                             ref tag,
                             self_closing: _,
                             ref attributes,
-                        }) => {
-                            if tag == "body" {
+                        }) => match tag.as_str() {
+                            "p" => {
                                 self.insert_element(tag, attributes.to_vec());
                                 token = self.t.next();
-                                self.mode = InsertionMode::InBody;
                                 continue;
                             }
-                        }
+                            _ => {
+                                token = self.t.next();
+                            }
+                        },
                         Some(HtmlToken::Eof) | None => {
                             return self.window.clone();
                         }
@@ -209,6 +211,13 @@ impl HtmlParser {
                                     } else {
                                         token = self.t.next();
                                     }
+                                    continue;
+                                }
+                                "p" => {
+                                    let element_kind = ElementKind::from_str(tag)
+                                        .expect("failed to convert string to ElementKind");
+                                    token = self.t.next();
+                                    self.pop_until(element_kind);
                                     continue;
                                 }
                                 _ => {
