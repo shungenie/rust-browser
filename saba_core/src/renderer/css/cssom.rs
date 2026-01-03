@@ -16,9 +16,9 @@ impl CssParser {
         Self { t: t.peekable() }
     }
 
-    pub fn parse_stylesheet(&mut self) -> Stylesheet {
+    pub fn parse_stylesheet(&mut self) -> StyleSheet {
         // StyleSheet構造体のインスタンスを作成する
-        let mut sheet = Stylesheet::new();
+        let mut sheet = StyleSheet::new();
 
         // トークン列からルールのリストを作成し、StyleSheetのフィールドに設定する
         sheet.set_rules(self.consume_list_of_rules());
@@ -189,11 +189,11 @@ impl CssParser {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Stylesheet {
+pub struct StyleSheet {
     pub rules: Vec<QualifiedRule>,
 }
 
-impl Stylesheet {
+impl StyleSheet {
     pub fn new() -> Self {
         Self { rules: Vec::new() }
     }

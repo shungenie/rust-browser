@@ -88,6 +88,8 @@ impl ComputedStyle {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+
 pub struct Color {
     name: Option<String>,
     code: String,
