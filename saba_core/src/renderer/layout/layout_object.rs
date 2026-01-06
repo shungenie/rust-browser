@@ -175,6 +175,23 @@ impl LayoutObject {
     ) {
         self.style.defaulting(node, parent_style);
     }
+
+    pub fn update_kind(&mut self) {
+        match self.node_kind() {
+            NodeKind::Document => panic!("should not create a layout object for Document node"),
+            NodeKind::Element(_) => {
+                let display = self.style.display();
+                match display {
+                    DisplayType::Block => self.kind = LayoutObjectKind::Block,
+                    DisplayType::Inline => self.kind = LayoutObjectKind::Inline,
+                    DisplayType::DisplayNone => {
+                        panic!("should not create a layout object for display: none")
+                    }
+                }
+            }
+            NodeKind::Text(_) => self.kind = LayoutObjectKind::Text,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
