@@ -6,10 +6,14 @@ use crate::renderer::layout::layout_object::LayoutObjectKind;
 use crate::renderer::layout::layout_object::create_layout_object;
 use crate::renderer::layout::layout_object::LayoutObject;
 use alloc::rc::Rc;
+use core::borrow::Borrow;
 use core::cell::RefCell;
 use crate::constants::CONTENT_AREA_WIDTH;
 use crate::renderer::layout::layout_object::LayoutPoint;
 use crate::renderer::layout::layout_object::LayoutSize;
+use crate::constants::CHAR_WIDTH;
+use crate::constants::CHAR_HEIGHT_WITH_PADDING;
+use crate::renderer::layout::computed_style::FontSize;
 
 #[derive(Debug, Clone)]
 pub struct LayoutView {
@@ -42,6 +46,101 @@ impl LayoutView {
             None,
             None,
         );
+    }
+
+    fn calculate_node_size(node: &Option<Rc<RefCell<LayoutObject>>>, parent_size: LayoutSize) {
+        if let Some(n) = node {
+            // ノードがブロック要素の場合、子ノードのレイアウトを計算する前に横幅を決める
+            if n.borrow().kind() == LayoutObjectKind::Block {
+                n.borrow_mut().compute_size(parent_size);
+            }
+
+            let first_child = n.borrow().first_child();
+            Self::calculate_node_size(&first_child, n.borrow().size());
+
+            let next_sibling = n.borrow().next_sibling();
+            Self::calculate_node_size(&next_sibling, parent_size);
+
+            // こノードのサイズが決まった後にサイズを計算する
+            // ブロック要素の時、高さはこノードの高さに依存する
+            // インライン要素の時、高さも横幅も子ノードに依存する
+            n.borrow_mut().compute_size(parent_size);
+        }
+    }
+
+    pub fn compute_size(&mut self, parent_size: LayoutSize) {
+        let mut size = LayoutSize::new(0, 0);
+
+        match self.kind() {
+            LayoutObjectKind::Block => {
+                size.set_width(parent_size.width());
+
+                // 全ての子ノードの高さを足し合わせた結果が高さになる。
+                // ただし、インライン要素が横に並んでいる場合は注意が必要
+                let mut height = 0;
+                let mut child = self.first_child();
+                let mut previous_child_kind = LayoutObjectKind::Block;
+                while child.is_some() {
+                    let c = match child {
+                        Some(c) => c,
+                        None => panic!("first child should exist "),
+                    };
+
+                    if previous_child_kind == LayoutObjectKind::Block || c.borrow().kind() == LayoutObjectKind::Block {
+                        height += c.borrow().size.height();
+                    }
+
+                    previous_child_kind = c.borrow().kind();
+                    child = c.borrow().next_sibling();
+                }
+                size.set_height(height)
+            }
+            LayoutObjectKind::Inline => {
+                // 全ての子ノードの高さと横幅を足し合わせた結果が現在のノードの高さと横幅となる
+                let mut width = 0;
+                let mut height = 0;
+                let mut child = self.first_child();
+                while child.is_some() {
+                    let c = match child {
+                        Some(c) => c,
+                        None => panic!("first child should exist "),
+                    };
+
+                    width += c.borrow().size.width();
+                    height += c.borrow().size.height();
+
+                    child = c.borrow().next_sibling();
+                }
+
+                size.set_width(width);
+                size.set_height(height);
+            }
+            LayoutObjectKind::Text => {
+                if let NodeKind::Text(t) = self.node_kind() {
+                    let ratio = match self.style.font_size() {
+                        FontSize::Medium => 1,
+                        FontSize::XLarge => 2,
+                        FontSize::XXLarge => 3,
+                    };
+                    let width = CHAR_WIDTH * ratio * t.len() as i64;
+                    if width > CONTENT_AREA_WIDTH {
+                        // テキストが複数行の時
+                        size.set_width(CONTENT_AREA_WIDTH);
+                        let line_num = if width.wrapping_rem(CONTENT_AREA_WIDTH) == 0 {
+                            width.wrapping_div(CONTENT_AREA_WIDTH)
+                        } else {
+                            width.wrapping_div(CONTENT_AREA_WIDTH) + 1
+                        };
+                        size.set_height(CHAR_HEIGHT_WITH_PADDING * ratio * line_num);
+                    } else {
+                        // テキストが1行の時
+                        size.set_width(width);
+                        size.set_height(CHAR_HEIGHT_WITH_PADDING * ratio);
+                    }
+                }
+            }
+        }
+        self.size = size;
     }
 }
 
