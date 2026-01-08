@@ -142,6 +142,82 @@ impl LayoutView {
         }
         self.size = size;
     }
+
+    fn calculate_node_position(
+        node: &Option<Rc<RefCell<LayoutObject>>>,
+        parent_point: LayoutPoint,
+        previous_sibling_kind: LayoutObjectKind,
+        previous_sibling_point: Option<LayoutPoint>,
+        previous_sibling_size: Option<LayoutSize>,
+    ) {
+        if let Some(n) = node {
+            n.borrow_mut().compute_position(
+                parent_point,
+                previous_sibling_kind,
+                previous_sibling_point,
+                previous_sibling_size,
+            );
+
+            // ノード(node)の子ノードの位置を計算する
+            let first_child = n.borrow().first_child();
+            Self::calculate_node_position(
+                &first_child, 
+                n.borrow().point(), 
+                LayoutObjectKind::Block, 
+                None, 
+                None,
+            );
+
+            // ノード(node)の兄弟ノードの位置を計算する
+            let next_sibling = n.borrow().next_sibling();
+            Self::calculate_node_position(
+                &next_sibling,
+                parent_point,
+                n.borrow().kind(),
+                Some(n.borrow().point()),
+                Some(n.borrow().size()),
+            );
+        }
+    }
+
+    // 一つのノードの位置を計算する
+    fn compute_position(
+        &mut self,
+        parent_point: LayoutPoint,
+        previous_sibling_kind: LayoutObjectKind,
+        previous_sibling_point: Option<LayoutPoint>,
+        previous_sibling_size: Option<LayoutSize>,
+    ) {
+        let mut point = LayoutPoint::new(0, 0);
+
+        match (self.kind(), previous_sibling_kind) {
+            // もしブロック要素が兄弟ノードの場合、Y軸方向に進む
+            (LayoutObjectKind::Block, _) | (_, LayoutObjectKind::Block) => {
+                if let (Some(size), Some(pos)) = (previous_sibling_size, previous_sibling_point) {
+                    point.set_y(pos.y() + size.height());
+                } else {
+                    point.set_y(parent_point.y());
+                }
+                point.set_x(parent_point.x());
+            }
+            // もしインライン要素が並ぶ場合、X軸方向に進む
+            (LayoutObjectKind::Inline, LayoutObjectKind::Inline) => {
+                if let (Some(size), Some(pos)) = (previous_sibling_size, previous_sibling_point) {
+                    point.set_x(pos.x() + size.width());
+                    point.set_y(pos.y());
+                } else {
+                    point.set_x(parent_point.x());
+                    point.set_y(parent_point.y());
+                }
+            }
+            // それ以外(テキスト)の場合、親ノードの位置を基準にする
+            _ => {
+                point.set_x(parent_point.x());
+                point.set_y(parent_point.y());
+            }
+        }
+        self.point = point;
+    }
 }
 
 fn build_layout_tree(
