@@ -192,7 +192,9 @@ impl LayoutObject {
             NodeKind::Text(_) => self.kind = LayoutObjectKind::Text,
         }
     }
+}
 
+impl PartialEq for LayoutObject {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
     }

@@ -259,7 +259,7 @@ pub enum DisplayType {
 }
 
 impl DisplayType {
-    fn default(node: Rc<RefCell<Node>>) -> Self {
+    fn default(node: &Rc<RefCell<Node>>) -> Self {
         match &node.borrow().kind() {
             NodeKind::Document => DisplayType::Block,
             NodeKind::Element(e) => {
