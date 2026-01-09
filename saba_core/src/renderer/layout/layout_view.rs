@@ -37,7 +37,7 @@ impl LayoutView {
         self.root.clone()
     }
 
-    fn update_layout(&mut_self) {
+    fn update_layout(&mut self) {
         Self::calculate_node_size(&self.root, LayoutSize::new(CONTENT_AREA_WIDTH, 0.0));
         Self::calculate_node_position(
             &self.root,
@@ -221,7 +221,7 @@ impl LayoutView {
 }
 
 fn build_layout_tree(
-    node: &Option<Rc<RefCell<LayoutObject>>>,
+    node: &Option<Rc<RefCell<Node>>>,
     parent_obj: &Option<Rc<RefCell<LayoutObject>>>,
     cssom: &StyleSheet,
 ) -> Option<Rc<RefCell<LayoutObject>>> {
