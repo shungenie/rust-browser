@@ -1,19 +1,16 @@
+
+use crate::constants::CONTENT_AREA_WIDTH;
 use crate::renderer::css::cssom::StyleSheet;
 use crate::renderer::dom::api::get_target_element_node;
 use crate::renderer::dom::node::ElementKind;
 use crate::renderer::dom::node::Node;
-use crate::renderer::layout::layout_object::LayoutObjectKind;
 use crate::renderer::layout::layout_object::create_layout_object;
 use crate::renderer::layout::layout_object::LayoutObject;
-use alloc::rc::Rc;
-use core::borrow::Borrow;
-use core::cell::RefCell;
-use crate::constants::CONTENT_AREA_WIDTH;
+use crate::renderer::layout::layout_object::LayoutObjectKind;
 use crate::renderer::layout::layout_object::LayoutPoint;
 use crate::renderer::layout::layout_object::LayoutSize;
-use crate::constants::CHAR_WIDTH;
-use crate::constants::CHAR_HEIGHT_WITH_PADDING;
-use crate::renderer::layout::computed_style::FontSize;
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 fn build_layout_tree(
     node: &Option<Rc<RefCell<Node>>>,
@@ -119,21 +116,6 @@ impl LayoutView {
         tree
     }
 
-    pub fn root(&self) -> Option<Rc<RefCell<LayoutObject>>> {
-        self.root.clone()
-    }
-
-    fn update_layout(&mut self) {
-        Self::calculate_node_size(&self.root, LayoutSize::new(CONTENT_AREA_WIDTH, 0.0));
-        Self::calculate_node_position(
-            &self.root,
-            LayoutPoint::new(0, 0),
-            LayoutObjectKind::Block,
-            None,
-            None,
-        );
-    }
-
     fn calculate_node_size(node: &Option<Rc<RefCell<LayoutObject>>>, parent_size: LayoutSize) {
         if let Some(n) = node {
             // ノードがブロック要素の場合、子ノードのレイアウトを計算する前に横幅を決める
@@ -154,81 +136,6 @@ impl LayoutView {
         }
     }
 
-    pub fn compute_size(&mut self, parent_size: LayoutSize) {
-        let mut size = LayoutSize::new(0, 0);
-
-        match self.kind() {
-            LayoutObjectKind::Block => {
-                size.set_width(parent_size.width());
-
-                // 全ての子ノードの高さを足し合わせた結果が高さになる。
-                // ただし、インライン要素が横に並んでいる場合は注意が必要
-                let mut height = 0;
-                let mut child = self.first_child();
-                let mut previous_child_kind = LayoutObjectKind::Block;
-                while child.is_some() {
-                    let c = match child {
-                        Some(c) => c,
-                        None => panic!("first child should exist "),
-                    };
-
-                    if previous_child_kind == LayoutObjectKind::Block || c.borrow().kind() == LayoutObjectKind::Block {
-                        height += c.borrow().size.height();
-                    }
-
-                    previous_child_kind = c.borrow().kind();
-                    child = c.borrow().next_sibling();
-                }
-                size.set_height(height)
-            }
-            LayoutObjectKind::Inline => {
-                // 全ての子ノードの高さと横幅を足し合わせた結果が現在のノードの高さと横幅となる
-                let mut width = 0;
-                let mut height = 0;
-                let mut child = self.first_child();
-                while child.is_some() {
-                    let c = match child {
-                        Some(c) => c,
-                        None => panic!("first child should exist "),
-                    };
-
-                    width += c.borrow().size.width();
-                    height += c.borrow().size.height();
-
-                    child = c.borrow().next_sibling();
-                }
-
-                size.set_width(width);
-                size.set_height(height);
-            }
-            LayoutObjectKind::Text => {
-                if let NodeKind::Text(t) = self.node_kind() {
-                    let ratio = match self.style.font_size() {
-                        FontSize::Medium => 1,
-                        FontSize::XLarge => 2,
-                        FontSize::XXLarge => 3,
-                    };
-                    let width = CHAR_WIDTH * ratio * t.len() as i64;
-                    if width > CONTENT_AREA_WIDTH {
-                        // テキストが複数行の時
-                        size.set_width(CONTENT_AREA_WIDTH);
-                        let line_num = if width.wrapping_rem(CONTENT_AREA_WIDTH) == 0 {
-                            width.wrapping_div(CONTENT_AREA_WIDTH)
-                        } else {
-                            width.wrapping_div(CONTENT_AREA_WIDTH) + 1
-                        };
-                        size.set_height(CHAR_HEIGHT_WITH_PADDING * ratio * line_num);
-                    } else {
-                        // テキストが1行の時
-                        size.set_width(width);
-                        size.set_height(CHAR_HEIGHT_WITH_PADDING * ratio);
-                    }
-                }
-            }
-        }
-        self.size = size;
-    }
-
     fn calculate_node_position(
         node: &Option<Rc<RefCell<LayoutObject>>>,
         parent_point: LayoutPoint,
@@ -247,10 +154,10 @@ impl LayoutView {
             // ノード(node)の子ノードの位置を計算する
             let first_child = n.borrow().first_child();
             Self::calculate_node_position(
-                &first_child, 
-                n.borrow().point(), 
-                LayoutObjectKind::Block, 
-                None, 
+                &first_child,
+                n.borrow().point(),
+                LayoutObjectKind::Block,
+                None,
                 None,
             );
 
@@ -266,42 +173,49 @@ impl LayoutView {
         }
     }
 
-    // 一つのノードの位置を計算する
-    fn compute_position(
-        &mut self,
-        parent_point: LayoutPoint,
-        previous_sibling_kind: LayoutObjectKind,
-        previous_sibling_point: Option<LayoutPoint>,
-        previous_sibling_size: Option<LayoutSize>,
-    ) {
-        let mut point = LayoutPoint::new(0, 0);
+    fn update_layout(&mut self) {
+        Self::calculate_node_size(&self.root, LayoutSize::new(CONTENT_AREA_WIDTH, 0.0));
+        Self::calculate_node_position(
+            &self.root,
+            LayoutPoint::new(0, 0),
+            LayoutObjectKind::Block,
+            None,
+            None,
+        );
+    }
 
-        match (self.kind(), previous_sibling_kind) {
-            // もしブロック要素が兄弟ノードの場合、Y軸方向に進む
-            (LayoutObjectKind::Block, _) | (_, LayoutObjectKind::Block) => {
-                if let (Some(size), Some(pos)) = (previous_sibling_size, previous_sibling_point) {
-                    point.set_y(pos.y() + size.height());
-                } else {
-                    point.set_y(parent_point.y());
-                }
-                point.set_x(parent_point.x());
-            }
-            // もしインライン要素が並ぶ場合、X軸方向に進む
-            (LayoutObjectKind::Inline, LayoutObjectKind::Inline) => {
-                if let (Some(size), Some(pos)) = (previous_sibling_size, previous_sibling_point) {
-                    point.set_x(pos.x() + size.width());
-                    point.set_y(pos.y());
-                } else {
-                    point.set_x(parent_point.x());
-                    point.set_y(parent_point.y());
-                }
-            }
-            // それ以外(テキスト)の場合、親ノードの位置を基準にする
-            _ => {
-                point.set_x(parent_point.x());
-                point.set_y(parent_point.y());
-            }
-        }
-        self.point = point;
+    pub fn root(&self) -> Option<Rc<RefCell<LayoutObject>>> {
+        self.root.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::alloc::string::ToString;
+    use crate::renderer::css::cssom::CssParser;
+    use crate::renderer::css::token::CssTokenizer;
+    use crate::renderer::dom::api::get_style_content;
+    use crate::renderer::dom::node::Element;
+    use crate::renderer::dom::node::NodeKind;
+    use crate::renderer::html::parser::HtmlParser;
+    use crate::renderer::html::token::HtmlTokenizer;
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
+    fn create_layout_view(html: String) -> LayoutView {
+        let t = HtmlTokenizer::new(html);
+        let window = HtmlParser::new(t).construct_tree();
+        let dom = window.borrow().document();
+        let style = get_style_content(dom.clone());
+        let css_tokenizer = CssTokenizer::new(style);
+        let cssom = CssParser::new(css_tokenizer).parse_stylesheet();
+        LayoutView::new(dom, &cssom)
+    }
+
+    #[test]
+    fn test_empty() {
+        let layout_view = create_layout_view("".to_string());
+        assert_eq!(None, layout_view.root());
     }
 }
