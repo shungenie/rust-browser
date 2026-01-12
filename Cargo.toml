@@ -5,7 +5,7 @@ edition = "2021"
 
 [features]
 default = ["wasabi"] # --features=wasabiの指定がなくても、cargo buildとコマンドを使用したときにデフォルトでwasabiの機能が設定されます。
-wasabi = ["dep:net_wasabi", "dep:noli"]
+wasabi = ["dep:net_wasabi", "dep:ui_wasabi", "dep:noli"]
 
 [[bin]]
 name = "saba"
@@ -15,11 +15,12 @@ required-features = ["wasabi"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [workspace]
 members = [ "net/wasabi",
-	"saba_core",
+	"saba_core", "ui/wasabi",
 ]
 
 [dependencies]
 saba_core = { path = "./saba_core" }
 net_wasabi = { path = "./net/wasabi", optional = true }
+ui_wasabi = { path = "./ui/wasabi", optional = true }
 noli = { git = "https://github.com/hikalium/wasabi.git", branch = "for_saba", optional = true }
 
