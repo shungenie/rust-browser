@@ -3,6 +3,7 @@ use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 use core::cell::RefCell;
+use crate::cursor::Cursor;
 use noli::error::Result as OsResult;
 use noli::prelude::SystemApi;
 use noli::println;
@@ -31,6 +32,7 @@ pub struct WasabiUI {
     input_url: String,
     input_mode: InputMode,
     window: Window,
+    cursor: Cursor,
 }
 
 impl WasabiUI {
@@ -48,6 +50,7 @@ impl WasabiUI {
                 WINDOW_HEIGHT,
             )
             .unwrap(),
+            cursor: Cursor::new(),
         }
     }
 
@@ -120,6 +123,11 @@ impl WasabiUI {
             button: button,
             position,
         }) = Api::get_mouse_cursor_info() {
+            self.window.flush_area(self.cursor.rect());
+            self.cursor.set_position(position.x, position.y);
+            self.window.flush_area(self.cursor.rect());
+            self.cursor.flush();
+            
             if button.l() || button.c() || button.r() {
                 // 相対位置を計算する
                 let relative_pos = (
