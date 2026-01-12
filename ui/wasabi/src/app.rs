@@ -20,6 +20,7 @@ use saba_core::constants::WINDOW_INIT_Y_POS;
 use saba_core::constants::WINDOW_WIDTH;
 use saba_core::constants::*;
 use saba_core::error::Error;
+use saba_core::http::HttpResponse;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum InputMode {
@@ -103,22 +104,22 @@ impl WasabiUI {
         Ok(())
     }
 
-    pub fn start(&mut self) -> Result<(), Error> {
+    pub fn start(&mut self, handle_url: fn(String) -> Result<HttpResponse, Error>) -> Result<(), Error> {
         self.setup()?;
 
-        self.run_app()?;
+        self.run_app(handle_url)?;
 
         Ok(())
     }
 
-    fn run_app(&mut self) -> Result<(), Error> {
+    fn run_app(&mut self, handle_url: fn(String) -> Result<HttpResponse, Error>) -> Result<(), Error> {
         loop {
-            self.handle_mouse_input()?;
-            self.handle_key_input()?;
+            self.handle_mouse_input(handle_url)?;
+            self.handle_key_input(handle_url)?;
         }
     }
 
-    fn handle_mouse_input(&mut self) -> Result<(), Error> {
+    fn handle_mouse_input(&mut self, handle_url: fn(String) -> Result<HttpResponse, Error>) -> Result<(), Error> {
         if let Some(MouseEvent {
             button: button,
             position,
@@ -127,7 +128,7 @@ impl WasabiUI {
             self.cursor.set_position(position.x, position.y);
             self.window.flush_area(self.cursor.rect());
             self.cursor.flush();
-            
+
             if button.l() || button.c() || button.r() {
                 // 相対位置を計算する
                 let relative_pos = (
@@ -157,7 +158,7 @@ impl WasabiUI {
         Ok(())
     }
 
-    fn handle_key_input(&mut self) -> Result<(), Error> {
+    fn handle_key_input(&mut self, handle_url: fn(String) -> Result<HttpResponse, Error>) -> Result<(), Error> {
         match self.input_mode {
             InputMode::Normal => {
                 // InputModeがNormalの時、キー入力を無視
@@ -165,7 +166,13 @@ impl WasabiUI {
             }
             InputMode::Editing => {
                 if let Some(c) = Api::read_key() {
-                    if c == 0x7F as char || c == 0x08 as char {
+                    if c == 0x0A as char {
+                        // Enterキーが押されたのでナビゲーションを開始する
+                        self.start_navigation(handle_url, self.input_url.clone())?;
+
+                        self.input_url = String::new();
+                        self.input_mode = InputMode::Normal;
+                    } else if c == 0x7F as char || c == 0x08 as char {
                         // デリートキーまたはバックスペースキーが押されたので最後の文字を削除する
                         self.input_url.pop();
                         self.update_address_bar()?;
@@ -176,6 +183,7 @@ impl WasabiUI {
                 }
             }
         }
+
         Ok(())
     }
 
@@ -231,5 +239,38 @@ impl WasabiUI {
 
         Ok(())
     }
-}
 
+    fn start_navigation(
+        &mut self,
+        handle_url: fn(String) -> Result<HttpResponse, Error>,
+        destination: String,
+    ) -> Result<(), Error> {
+        self.clear_content_area()?;
+
+        match handle_url(destination) {
+            Ok(response) => {
+                let page = self.browser.borrow().current_page();
+                page.borrow_mut().receive_response(response);
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn clear_content_area(&mut self) -> Result<(), Error> {
+        // コンテンツエリアを白く塗りつぶす
+        if self.window.fill_rect(WHITE, 0, TOOLBAR_HEIGHT + 2, CONTENT_AREA_WIDTH, CONTENT_AREA_HEIGHT - 2)
+            .is_err() {
+                return Err(Error::InvalidUI(
+                    "failed to clear content area".to_string(),
+                ));
+            }
+
+            self.window.flush();
+
+        Ok(())
+    }
+}
