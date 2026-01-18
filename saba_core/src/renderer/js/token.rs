@@ -77,3 +77,15 @@ impl Iterator for JsLexer {
         Some(token)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty() {
+        let input = "".to_string();
+        let mut lexer = JsLexer::new(input).peekable();
+        assert!(lexer.peek().is_none());
+    }
+}
