@@ -2,6 +2,7 @@ use alloc::rc::Rc;
 use crate::renderer::js::token::JsLexer;
 use core::iter::Peekable;
 use alloc::vec::Vec;
+use crate::renderer::js::token::Token;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node{
@@ -70,6 +71,91 @@ pub struct JsParser {
 impl JsParser {
     pub fn new(t: JsLexer) -> Self {
         Self { t: t.peekable() }
+    }
+
+    pub fn parse_ast(&mut self) -> Program {
+        let mut program = Program::new();
+
+        let mut body = Vec::new();
+
+        loop {
+            let node = self.source_element();
+
+            match node {
+                Some(n) => body.push(n),
+                None => {
+                    program.set_body(body);
+                    return program;
+                }
+            }
+        }
+    }
+
+    fn source_element(&mut self) -> Option<Rc<Node>> {
+        match self.t.peek() {
+            Some(t) => t,
+            None => return None,
+        };
+
+        self.statement()
+    }
+
+    fn statement(&mut self) -> Option<Rc<Node>> {
+        let node = Node::new_expression_statement(self.assignment_expression());
+
+        if let Some(Token::Punctuator(c)) = self.t.peek() {
+            // ';'を消費する
+            if c == &';' {
+                assert!(self.t.next().is_some());
+            }
+        }
+
+        node
+    }
+
+    fn assignment_expression(&mut self) -> Option<Rc<Node>> {
+        self.additive_expression()
+    }
+
+    fn additive_expression(&mut self) -> Option<Rc<Node>> {
+        let left = self.left_hand_side_expression();
+
+        let t = match self.t.peek() {
+            Some(token) => token.clone(),
+            None => return left,
+        };
+
+        match t {
+            Token::Punctuator(c) => match c {
+                '+' | '-' => {
+                    // +または-の記号を消費する
+                    assert!(self.t.next().is_some());
+                    Node::new_additive_expression(c, left, self.assignment_expression())
+                }
+                _ => left,
+            },
+            _ => left,
+        }
+    }
+
+    fn left_hand_side_expression(&mut self) -> Option<Rc<Node>> {
+        self.member_expression()
+    }
+
+    fn member_expression(&mut self) -> Option<Rc<Node>> {
+        self.primary_expression()
+    }
+
+    fn primary_expression(&mut self) -> Option<Rc<Node>> {
+        let t = match self.t.next() {
+            Some(token) => token,
+            None => return None,
+        };
+
+        match t {
+            Token::Number(value) => Node::new_numeric_literal(value),
+            _ => None,
+        }
     }
 }
 
