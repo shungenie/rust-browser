@@ -1,6 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::string::ToString;
+static RESERVED_WORDS: [&str; 1] = ["var"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -8,6 +9,9 @@ pub enum Token {
     Punctuator(char),
     /// https://262.ecma-international.org/#sec-literals-numeric-literals
     Number(u64),
+    Identifier(String),
+    Keyword(String),
+    StringLiteral(String),
 }
 
 pub struct JsLexer {
@@ -43,6 +47,30 @@ impl JsLexer {
         }
         return num;
     }
+
+    fn contains(&self, keyword: &str) -> bool {
+        for i in 0..keyword.len() {
+            if keyword
+                .chars()
+                .nth(i)
+                .expect("failed to access to i-th char")
+                != self.input[self.pos + i]
+            {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn check_reserved_word(&self) -> Option<String> {
+        for word in RESERVED_WORDS {
+            if self.contains(word) {
+                return Some(word.to_string());
+            }
+        }
+
+        None
+    }
 }
 
 impl Iterator for JsLexer {
@@ -60,7 +88,14 @@ impl Iterator for JsLexer {
             if self.pos >= self.input.len() {
                 return None;
             }
-        }    
+        }
+
+        // 予約語が現れたら、Keywordトークンを返す
+        if let Some(keyword) = self.check_reserved_word() {
+            self.pos += keyword.len();
+            let token = Some(Token::Keyword(keyword));
+            return token;
+        }
 
         let c = self.input[self.pos];
 
